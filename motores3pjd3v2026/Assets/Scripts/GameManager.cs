@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.InputSystem; 
+using UnityEngine.InputSystem;
+
 
 public class GameManager : MonoBehaviour
 {
@@ -15,7 +16,7 @@ public class GameManager : MonoBehaviour
 
     public EstadoJogo estadoAtual;
 
-    private void Awake()
+    void Awake()
     {
         if (Instance == null)
         {
@@ -28,45 +29,63 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void Start()
-    {
-        MudarEstado(EstadoJogo.Iniciando);
-        CarregarCena("Splash");
-    }
-
-    
-    private void OnEnable()
+    void OnEnable()
     {
         SceneManager.sceneLoaded += QuandoCenaCarregada;
     }
 
-    private void OnDisable()
+    void OnDisable()
     {
         SceneManager.sceneLoaded -= QuandoCenaCarregada;
     }
 
-    void QuandoCenaCarregada(Scene scene, LoadSceneMode mode)
+    void Start()
     {
-        if (estadoAtual == EstadoJogo.Gameplay)
-        {
-            PlayerInput player = FindObjectOfType<PlayerInput>();
-
-            if (player != null)
-            {
-                player.ActivateInput();
-                Debug.Log("Input ativado para o jogador");
-            }
-        }
+        MudarEstado(EstadoJogo.Iniciando);
     }
 
     public void MudarEstado(EstadoJogo novoEstado)
     {
         estadoAtual = novoEstado;
         Debug.Log("Estado atual: " + estadoAtual);
+
+        switch (estadoAtual)
+        {
+            case EstadoJogo.Iniciando:
+                SceneManager.LoadScene("Splash");
+                break;
+
+            case EstadoJogo.MenuPrincipal:
+                SceneManager.LoadScene("MenuPrincipal");
+                break;
+
+            case EstadoJogo.Gameplay:
+                SceneManager.LoadScene("GetStarted_Scene");
+                break;
+        }
     }
 
-    public void CarregarCena(string nomeCena)
+    void QuandoCenaCarregada(Scene scene, LoadSceneMode mode)
     {
-        SceneManager.LoadScene(nomeCena);
+        if (estadoAtual == EstadoJogo.Gameplay)
+        {
+            PlayerInput player = FindFirstObjectByType<PlayerInput>();
+
+            if (player != null)
+            {
+                player.ActivateInput();
+                
+            }
+        }
+    }
+
+    public void IniciarJogo()
+    {
+        MudarEstado(EstadoJogo.Gameplay);
+    }
+
+    public void IrParaMenu()
+    {
+        MudarEstado(EstadoJogo.MenuPrincipal);
     }
 }

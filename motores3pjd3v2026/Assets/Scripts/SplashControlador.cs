@@ -11,8 +11,6 @@ public class SplashControlador : MonoBehaviour
     IEnumerator TempoSplash()
     {
         yield return new WaitForSeconds(2f);
-
-        GameManager.Instance.MudarEstado(GameManager.EstadoJogo.MenuPrincipal);
-        GameManager.Instance.CarregarCena("MenuPrincipal");
+        GameManager.Instance.IrParaMenu();
     }
 }
