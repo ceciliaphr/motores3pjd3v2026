@@ -1,6 +1,10 @@
 <component name="InspectionProjectProfileManager">
   <profile version="1.0">
     <option name="myName" value="Project Default" />
+<<<<<<< HEAD
     <inspection_tool class="CheckXmlFileWithXercesValidator" enabled="true" level="ERROR" enabled_by_default="true" />
+=======
+    <inspection_tool class="CssNegativeValue" enabled="true" level="ERROR" enabled_by_default="true" />
+>>>>>>> 621477da11afca24957c94cca121c60a3f515ddf
   </profile>
 </component>
