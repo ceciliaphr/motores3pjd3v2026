@@ -1,91 +1,35 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.InputSystem;
-
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager Instance;
+    [Header("Configurações de Cena")]
+    [Tooltip("Nome da cena principal de Gameplay")]
+    public string GameplaySceneName = "Gameplay";
+    
+    [Tooltip("Nome da cena de interface (GUI)")]
+    public string GUISceneName = "GUI";
 
-    public enum EstadoJogo
+    private void Awake()
     {
-        Iniciando,
-        MenuPrincipal,
-        Gameplay
+        // Garante que o GameManager não seja destruído ao carregar novas cenas
+        DontDestroyOnLoad(this.gameObject);
     }
 
-    public EstadoJogo estadoAtual;
-
-    void Awake()
+    private void Start()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        // Ao iniciar a cena _Boot, carregamos o jogo
+        CarregarJogo();
     }
 
-    void OnEnable()
+    public void CarregarJogo()
     {
-        SceneManager.sceneLoaded += QuandoCenaCarregada;
-    }
+        // 1. Carrega a cena de Gameplay como a cena principal (limpa tudo antes)
+        SceneManager.LoadScene(GameplaySceneName, LoadSceneMode.Single);
 
-    void OnDisable()
-    {
-        SceneManager.sceneLoaded -= QuandoCenaCarregada;
-    }
-
-    void Start()
-    {
-        MudarEstado(EstadoJogo.Iniciando);
-    }
-
-    public void MudarEstado(EstadoJogo novoEstado)
-    {
-        estadoAtual = novoEstado;
-        Debug.Log("Estado atual: " + estadoAtual);
-
-        switch (estadoAtual)
-        {
-            case EstadoJogo.Iniciando:
-                SceneManager.LoadScene("Splash");
-                break;
-
-            case EstadoJogo.MenuPrincipal:
-                SceneManager.LoadScene("MenuPrincipal");
-                break;
-
-            case EstadoJogo.Gameplay:
-                SceneManager.LoadScene("GetStarted_Scene");
-                break;
-        }
-    }
-
-    void QuandoCenaCarregada(Scene scene, LoadSceneMode mode)
-    {
-        if (estadoAtual == EstadoJogo.Gameplay)
-        {
-            PlayerInput player = FindFirstObjectByType<PlayerInput>();
-
-            if (player != null)
-            {
-                player.ActivateInput();
-                
-            }
-        }
-    }
-
-    public void IniciarJogo()
-    {
-        MudarEstado(EstadoJogo.Gameplay);
-    }
-
-    public void IrParaMenu()
-    {
-        MudarEstado(EstadoJogo.MenuPrincipal);
+        // 2. Carrega a cena de GUI de forma aditiva (sobrepondo a Gameplay)
+        SceneManager.LoadScene(GUISceneName, LoadSceneMode.Additive);
+        
+        Debug.Log("Cenas carregadas com sucesso!");
     }
 }
