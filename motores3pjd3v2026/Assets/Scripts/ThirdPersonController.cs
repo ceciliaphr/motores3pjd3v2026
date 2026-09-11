@@ -6,87 +6,49 @@ using UnityEngine.InputSystem;
 namespace StarterAssets
 {
     [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(StarterAssetsInputs))]
 #if ENABLE_INPUT_SYSTEM 
     [RequireComponent(typeof(PlayerInput))]
 #endif
     public class ThirdPersonController : MonoBehaviour
     {
-        [Header("Player")]
-        [Tooltip("Move speed of the character in m/s")]
+        [Header("Player Identity")]
+        public int PlayerID = 1;
+
+        [Header("Câmera Split-Screen")]
+        public Transform playerCameraTransform;
+
+        [Header("Player Movement")]
         public float MoveSpeed = 2.0f;
-        [Tooltip("Sprint speed of the character in m/s")]
         public float SprintSpeed = 5.335f;
-        [Tooltip("How fast the character turns to face movement direction")]
-        [Range(0.0f, 0.3f)]
-        public float RotationSmoothTime = 0.12f;
-        [Tooltip("Acceleration and deceleration")]
+        public float SpeedBoostPerCoin = 0.5f;
+
+        [Range(0.0f, 0.3f)] public float RotationSmoothTime = 0.12f;
         public float SpeedChangeRate = 10.0f;
 
-        public AudioClip LandingAudioClip;
-        public AudioClip[] FootstepAudioClips;
-        [Range(0, 1)] public float FootstepAudioVolume = 0.5f;
-
-        [Space(10)]
-        [Tooltip("The height the player can jump")]
         public float JumpHeight = 1.2f;
-        [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
         public float Gravity = -15.0f;
-        [Space(10)]
-        [Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
         public float JumpTimeout = 0.50f;
-        [Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs")]
         public float FallTimeout = 0.15f;
 
         [Header("Player Grounded")]
-        [Tooltip("If the character is grounded or not. Not part of the CharacterController built in grounded check")]
         public bool Grounded = true;
-        [Tooltip("Useful for rough ground")]
         public float GroundedOffset = -0.14f;
-        [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
         public float GroundedRadius = 0.28f;
-        [Tooltip("What layers the character uses as ground")]
         public LayerMask GroundLayers;
 
-        [Header("Cinemachine")]
-        [Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
         public GameObject CinemachineCameraTarget;
-        [Tooltip("How far in degrees can you move the camera up")]
-        public float TopClamp = 70.0f;
-        [Tooltip("How far in degrees can you move the camera down")]
-        public float BottomClamp = -30.0f;
-        [Tooltip("Additional degress to override the camera. Useful for fine tuning camera position when locked")]
-        public float CameraAngleOverride = 0.0f;
-        [Tooltip("For locking the camera position on all axis")]
-        public bool LockCameraPosition = false;
-        public Vector2 LookSensitivity = new Vector2(7.5f, 5.0f);
 
-        // cinemachine
-        private float _cinemachineTargetYaw;
-        private float _cinemachineTargetPitch;
-
-        // Camera starting position and rotation
-        private Vector3 _cameraStartingPosition;
-        private Quaternion _cameraStartingRotation;
-
-        public bool IsRespawning { get; set; } = false;
-
-        // player
         private float _speed;
         private float _animationBlend;
         private float _targetRotation = 0.0f;
         private float _rotationVelocity;
         private float _verticalVelocity;
         private float _terminalVelocity = 53.0f;
-        
-        // --- ADICIONADO PARA A ATIVIDADE ---
-        private int _moedasColetadas = 0;
-        // ------------------------------------
 
-        // timeout deltatime
         private float _jumpTimeoutDelta;
         private float _fallTimeoutDelta;
 
-        // animation IDs
         private int _animIDSpeed;
         private int _animIDGrounded;
         private int _animIDJump;
@@ -99,74 +61,101 @@ namespace StarterAssets
         private Animator _animator;
         private CharacterController _controller;
         private StarterAssetsInputs _input;
-        private GameObject _mainCamera;
-
-        private const float _threshold = 0.01f;
         private bool _hasAnimator;
-
-        private bool IsCurrentDeviceMouse
-        {
-            get
-            {
-#if ENABLE_INPUT_SYSTEM
-                return _playerInput.currentControlScheme == "KeyboardMouse";
-#else
-                return false;
-#endif
-            }
-        }
-
-        private void Awake()
-        {
-            if (_mainCamera == null)
-            {
-                _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
-            }
-        }
 
         private void Start()
         {
-            _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
 #if ENABLE_INPUT_SYSTEM 
             _playerInput = GetComponent<PlayerInput>();
+            ConfigureControlScheme();
 #endif
             AssignAnimationIDs();
 
-            _cameraStartingPosition = CinemachineCameraTarget.transform.position;
-            _cameraStartingRotation = CinemachineCameraTarget.transform.rotation;
-
             _jumpTimeoutDelta = JumpTimeout;
             _fallTimeoutDelta = FallTimeout;
+
+            if (playerCameraTransform == null && Camera.main != null)
+            {
+                playerCameraTransform = Camera.main.transform;
+            }
         }
 
         private void Update()
         {
             _hasAnimator = TryGetComponent(out _animator);
+
+#if ENABLE_INPUT_SYSTEM
+            ReadInputFromControlScheme();
+#endif
             JumpAndGravity();
             GroundedCheck();
             Move();
         }
 
-        private void LateUpdate()
+#if ENABLE_INPUT_SYSTEM
+        private void ConfigureControlScheme()
         {
-            CameraRotation();
-        }
+            if (_playerInput == null) return;
 
-        // --- ADICIONADO PARA A ATIVIDADE ---
-        private void OnTriggerEnter(Collider other)
-        {
-            if (other.CompareTag("Coin"))
+            _playerInput.defaultActionMap = "Player";
+            _playerInput.currentActionMap?.Enable();
+
+            if (Keyboard.current != null)
             {
-                Destroy(other.gameObject);
-                _moedasColetadas++;
-                // Dispara o evento para qualquer UI que esteja escutando
-                PlayerOM.OnCoinCountChanged?.Invoke(_moedasColetadas);
+                string schemeName = (PlayerID == 1) ? "Player1_scheme" : "Player2_scheme";
+                _playerInput.SwitchCurrentControlScheme(schemeName, Keyboard.current);
             }
         }
-        // ------------------------------------
+
+        private void ReadInputFromControlScheme()
+        {
+            if (_playerInput == null || _playerInput.actions == null || _input == null) return;
+
+            InputAction moveAction = _playerInput.actions.FindAction("Move");
+            InputAction jumpAction = _playerInput.actions.FindAction("Jump");
+            InputAction sprintAction = _playerInput.actions.FindAction("Sprint");
+
+            if (moveAction != null) _input.move = moveAction.ReadValue<Vector2>();
+            if (jumpAction != null) _input.jump = jumpAction.IsPressed();
+            if (sprintAction != null) _input.sprint = sprintAction.IsPressed();
+        }
+#endif
+
+        public void ResetCameraRotation()
+        {
+            ResetCameraRotation(transform.eulerAngles.y);
+        }
+
+        public void ResetCameraRotation(float targetAngle)
+        {
+            _targetRotation = targetAngle;
+            if (CinemachineCameraTarget != null)
+            {
+                CinemachineCameraTarget.transform.rotation = Quaternion.Euler(0f, targetAngle, 0f);
+            }
+        }
+
+        private void OnFootstep(AnimationEvent animationEvent)
+        {
+        }
+
+        private void OnLand(AnimationEvent animationEvent)
+        {
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (other.CompareTag("Coin") || other.gameObject.name.Contains("Coin"))
+            {
+                MoveSpeed += SpeedBoostPerCoin;
+                SprintSpeed += SpeedBoostPerCoin;
+                PlayerOM.AddCoin(PlayerID);
+                Destroy(other.gameObject);
+            }
+        }
 
         private void AssignAnimationIDs()
         {
@@ -182,35 +171,7 @@ namespace StarterAssets
             Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z);
             Grounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers, QueryTriggerInteraction.Ignore);
 
-            if (_hasAnimator)
-            {
-                _animator.SetBool(_animIDGrounded, Grounded);
-            }
-        }
-
-        private void CameraRotation()
-        {
-            if (IsRespawning)
-            {
-                _cinemachineTargetYaw = 0f;
-                _cinemachineTargetPitch = 0f;
-                CinemachineCameraTarget.transform.position = _cameraStartingPosition;
-                CinemachineCameraTarget.transform.rotation = _cameraStartingRotation;
-                IsRespawning = false;
-                return;
-            }
-
-            if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
-            {
-                float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
-                _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier * LookSensitivity.x;
-                _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier * LookSensitivity.y;
-            }
-
-            _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
-            _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
-
-            CinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch + CameraAngleOverride, _cinemachineTargetYaw, 0.0f);
+            if (_hasAnimator) _animator.SetBool(_animIDGrounded, Grounded);
         }
 
         private void Move()
@@ -239,7 +200,9 @@ namespace StarterAssets
 
             if (_input.move != Vector2.zero)
             {
-                _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                float cameraYaw = playerCameraTransform != null ? playerCameraTransform.eulerAngles.y : 0f;
+                _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + cameraYaw;
+
                 float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity, RotationSmoothTime);
                 transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
             }
@@ -282,49 +245,6 @@ namespace StarterAssets
             }
 
             if (_verticalVelocity < _terminalVelocity) _verticalVelocity += Gravity * Time.deltaTime;
-        }
-
-        private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
-        {
-            if (lfAngle < -360f) lfAngle += 360f;
-            if (lfAngle > 360f) lfAngle -= 360f;
-            return Mathf.Clamp(lfAngle, lfMin, lfMax);
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
-            Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
-            if (Grounded) Gizmos.color = transparentGreen;
-            else Gizmos.color = transparentRed;
-            Gizmos.DrawSphere(new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z), GroundedRadius);
-        }
-
-        private void OnFootstep(AnimationEvent animationEvent)
-        {
-            if (animationEvent.animatorClipInfo.weight > 0.5f)
-            {
-                if (FootstepAudioClips.Length > 0)
-                {
-                    var index = Random.Range(0, FootstepAudioClips.Length);
-                    AudioSource.PlayClipAtPoint(FootstepAudioClips[index], transform.TransformPoint(_controller.center), FootstepAudioVolume);
-                }
-            }
-        }
-
-        private void OnLand(AnimationEvent animationEvent)
-        {
-            if (animationEvent.animatorClipInfo.weight > 0.5f)
-            {
-                AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
-            }
-        }
-
-        public void ResetCameraRotation(float targetYaw)
-        {
-            _cinemachineTargetYaw = targetYaw;
-            _cinemachineTargetPitch = 0f;
-            CinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch, _cinemachineTargetYaw, 0f);
         }
     }
 }

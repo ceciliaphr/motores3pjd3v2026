@@ -1,30 +1,68 @@
 using UnityEngine;
-using TMPro; // Necessário se estiver usando TextMeshPro
+using TMPro;
+using UnityEngine.UI;
 
 public class CoinUIController : MonoBehaviour
 {
-    private TextMeshProUGUI textoMoedas;
+    [Header("Contadores de Moedas")]
+    public TextMeshProUGUI p1ScoreText;
+    public TextMeshProUGUI p2ScoreText;
+
+    [Header("Painel de Vitória")]
+    public GameObject winnerPanel;
+    public TextMeshProUGUI winnerText;
+    public Button restartButton;
+
+    [Header("Regras do Jogo")]
+    public int targetScore = 10;
 
     private void Awake()
     {
-        textoMoedas = GetComponent<TextMeshProUGUI>();
+        if (winnerPanel != null) winnerPanel.SetActive(false);
+        if (restartButton != null) restartButton.onClick.AddListener(OnRestartButtonClicked);
     }
 
-    // Quando a interface é ativada, ela se INSCREVE no canal
     private void OnEnable()
     {
         PlayerOM.OnCoinCountChanged += AtualizarTextoMoedas;
+        PlayerOM.OnPlayerWon += ExibirVencedor;
     }
 
-    // Quando a interface é desativada, ela se DESINSCREVE (Evita memory leaks/erros)
     private void OnDisable()
     {
         PlayerOM.OnCoinCountChanged -= AtualizarTextoMoedas;
+        PlayerOM.OnPlayerWon -= ExibirVencedor;
     }
 
-    // Método que processa a notificação recebida do PlayerOM
-    private void AtualizarTextoMoedas(int totalAtual)
+    private void Start()
     {
-        textoMoedas.text = "Moedas: " + totalAtual;
+        AtualizarTextoMoedas(1, PlayerOM.GetCoins(1));
+        AtualizarTextoMoedas(2, PlayerOM.GetCoins(2));
+    }
+
+    private void AtualizarTextoMoedas(int playerID, int totalMoedas)
+    {
+        if (playerID == 1 && p1ScoreText != null) p1ScoreText.text = $"P1 Moedas: {totalMoedas}";
+        if (playerID == 2 && p2ScoreText != null) p2ScoreText.text = $"P2 Moedas: {totalMoedas}";
+
+        if (targetScore > 0 && totalMoedas >= targetScore)
+        {
+            PlayerOM.TriggerWin(playerID);
+        }
+    }
+
+    public void ExibirVencedor(int winnerPlayerID)
+    {
+        if (winnerPanel != null) winnerPanel.SetActive(true);
+        if (winnerText != null) winnerText.text = $"JOGADOR {winnerPlayerID} VENCEU!";
+        Time.timeScale = 0f;
+    }
+
+    private void OnRestartButtonClicked()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.ReiniciarPartida();
+        }
     }
 }
