@@ -148,13 +148,19 @@ namespace StarterAssets
 
         private void OnTriggerEnter(Collider other)
         {
+            // Coleta de moeda: aumenta velocidade e salva contador
             if (other.CompareTag("Coin") || other.gameObject.name.Contains("Coin"))
             {
-                MoveSpeed += SpeedBoostPerCoin;
-                SprintSpeed += SpeedBoostPerCoin;
+                ApplySpeedBoost();
                 PlayerOM.AddCoin(PlayerID);
                 Destroy(other.gameObject);
             }
+        }
+
+        public void ApplySpeedBoost()
+        {
+            MoveSpeed += SpeedBoostPerCoin;
+            SprintSpeed += SpeedBoostPerCoin;
         }
 
         private void AssignAnimationIDs()
